@@ -24,92 +24,92 @@ This project follows the Medallion Architecture (Bronze, Silver, Gold) to proces
 
 1. Create Azure Resources:
 
-  * Create a Resource Group.
+   * Create a Resource Group.
 
-  * Set up an Azure Storage Account.
+   * Set up an Azure Storage Account.
 
-  * Inside the Storage Account, create three containers: bronze, silver, and gold.
+   * Inside the Storage Account, create three containers: bronze, silver, and gold.
 
-  * Organize directories within these containers to store structured data.
+   * Organize directories within these containers to store structured data.
 
 2. Configure Azure Data Factory (ADF):
 
-  * Create a new Data Factory instance.
+   * Create a new Data Factory instance.
 
-  * Set up a Linked Service to pull data from an online source (HTTP).
+   * Set up a Linked Service to pull data from an online source (HTTP).
 
-  * Set up another Linked Service to store data in the Storage Account.
+   * Set up another Linked Service to store data in the Storage Account.
 
-  * Use the Copy Data Activity to move data from the web to the Bronze container.
+   * Use the Copy Data Activity to move data from the web to the Bronze container.
 
 3. Dynamic File Ingestion with Parameterized Pipelines:
 
-  * Define a string parameter for file naming: filename_@(dataset().p_month).parquet.
+   * Define a string parameter for file naming: filename_@(dataset().p_month).parquet.
 
-  * Implement a ForEach Loop to iterate over months using @range(1,12).
+   * Implement a ForEach Loop to iterate over months using @range(1,12).
 
-  * Insert the Copy Data Activity inside the loop.
+   * Insert the Copy Data Activity inside the loop.
 
-  * Use @item() in the dynamic content of the parameter value.
+   * Use @item() in the dynamic content of the parameter value.
 
-  * Handle month formatting issues (01, 02... 10, 11) with an IF condition:
-  ```
-  @greater(item(),9)
-  ```
-  * Modify filenames accordingly.
+   * Handle month formatting issues (01, 02... 10, 11) with an IF condition:
+   ```
+   @greater(item(),9)
+   ```
+   * Modify filenames accordingly.
 
 4. Execute and Debug:
 
-  * Test the pipeline using the Debug option.
+   * Test the pipeline using the Debug option.
 
-  * Validate that all data files are stored correctly in the Bronze layer.
+   * Validate that all data files are stored correctly in the Bronze layer.
 
 ### Phase 2: Data Transformation (Databricks & Silver Layer)
 
 1. Configure Azure Databricks:
 
-  * Create an Azure Databricks workspace.
+   * Create an Azure Databricks workspace.
 
-  * Set up a Service Principal in App Registration.
+   * Set up a Service Principal in App Registration.
 
-  * Assign the role Storage Blob Data Contributor to the Service Principal.
+   * Assign the role Storage Blob Data Contributor to the Service Principal.
 
-  * Generate a Secret Key under Certificates & Secrets.
+   * Generate a Secret Key under Certificates & Secrets.
 
 2. Access Data Lake from Databricks:
 
-  * Use PySpark to read data:
-    ```
-    df_trip_type = spark.read.format('csv')\
-        .option('inferschema', True)\
-        .option('header', True)\
-        .load('file_path')
-    ```
-  * Use recursiveFileLookup() to read multiple files.
+   * Use PySpark to read data:
+     ```
+     df_trip_type = spark.read.format('csv')\
+         .option('inferschema', True)\
+         .option('header', True)\
+         .load('file_path')
+     ```
+   * Use recursiveFileLookup() to read multiple files.
 
 3. Transform Data:
 
-  * Define a schema using StructType():
-  ```
-  schema = StructType([
-      StructField('Id', IntegerType()),
-      StructField('Name', StringType())
-  ])
-  ```
-  * Rename columns using withColumnRenamed():
-  ```
-  df_trip_type = df_trip_type.withColumnRenamed("description", "trip_description")
-  ```
-  * Use split() to extract values from strings:
-  ```
-  df_trip_zone = df_trip_zone.withColumn('zone1', split('Zone', '/')[0])
-  ```
-  * Convert date fields and extract year/month:
-  ```
-  df_trip = df_trip.withColumn('trip_date', to_date('column_name'))\
-    .withColumn('trip_year', year('column_name'))\
-    .withColumn('trip_month', month('column_name'))
-  ```
+   * Define a schema using StructType():
+   ```
+   schema = StructType([
+       StructField('Id', IntegerType()),
+       StructField('Name', StringType())
+   ])
+   ```
+   * Rename columns using withColumnRenamed():
+   ```
+   df_trip_type = df_trip_type.withColumnRenamed("description", "trip_description")
+   ```
+   * Use split() to extract values from strings:
+   ```
+   df_trip_zone = df_trip_zone.withColumn('zone1', split('Zone', '/')[0])
+   ```
+   * Convert date fields and extract year/month:
+   ```
+   df_trip = df_trip.withColumn('trip_date', to_date('column_name'))\
+     .withColumn('trip_year', year('column_name'))\
+     .withColumn('trip_month', month('column_name'))
+   ```
 4. Save Data to Silver Layer:
    ```
    df_trip_zone.write.format('csv')\
@@ -121,71 +121,71 @@ This project follows the Medallion Architecture (Bronze, Silver, Gold) to proces
 
 1. Create External Delta Tables:
 
-   * Delta tables store transactional logs, ensuring data consistency.
-   * Create an external database:
-     ```
-     CREATE DATABASE gold;
-     ```
-   * Load data into Delta format:
-     ```
-       df_zone.write.format('delta')\
-      .mode('append')\
-      .option('path', 'file_path/trip_zone')\
-      .saveAsTable('gold.trip_zone')
-     ```
+    * Delta tables store transactional logs, ensuring data consistency.
+    * Create an external database:
+      ```
+      CREATE DATABASE gold;
+      ```
+    * Load data into Delta format:
+      ```
+        df_zone.write.format('delta')\
+       .mode('append')\
+       .option('path', 'file_path/trip_zone')\
+       .saveAsTable('gold.trip_zone')
+      ```
 2. Delta Lake Versioning & Data Modifications:
 
-  * View history of changes:
-    ```
-    DESCRIBE HISTORY gold.trip_zone;
-    ```
-  * Update a record:
-    ```
-    UPDATE gold.trip_zone SET borough = 'EMR' WHERE LocationID = 1;
-    ```
-  * Delete a record:
-    ```
-    DELETE FROM gold.trip_zone WHERE LocationID = 1;
-    ```
-  * Restore a previous version:
-    ```
-    RESTORE gold.trip_zone TO VERSION AS OF 0;
-    ```
+   * View history of changes:
+     ```
+     DESCRIBE HISTORY gold.trip_zone;
+     ```
+   * Update a record:
+     ```
+     UPDATE gold.trip_zone SET borough = 'EMR' WHERE LocationID = 1;
+     ```
+   * Delete a record:
+     ```
+     DELETE FROM gold.trip_zone WHERE LocationID = 1;
+     ```
+   * Restore a previous version:
+     ```
+     RESTORE gold.trip_zone TO VERSION AS OF 0;
+     ```
 ### Phase 4: Power BI Integration
 
 1. Connect Power BI to Databricks:
 
-  * Use Partner Connect in Databricks.
-
-  * Generate an Access Token from Databricks Settings > Developer > Access Token.
-
-  * Use the token in Power BI to establish the connection.
+   * Use Partner Connect in Databricks.
+ 
+   * Generate an Access Token from Databricks Settings > Developer > Access Token.
+ 
+   * Use the token in Power BI to establish the connection.
 
 2. Create Dashboards & Reports:
 
-  * Load Gold Layer data into Power BI.
+   * Load Gold Layer data into Power BI.
 
 3. Build visualizations such as:
 
-  * Trip frequency analysis.
-
-  * Revenue trends.
-
-  * Geospatial mapping of taxi trips.
+   * Trip frequency analysis.
+ 
+   * Revenue trends.
+ 
+   * Geospatial mapping of taxi trips.
 
 ### Conclusion
 
 This project successfully demonstrates an end-to-end data pipeline using Azure services:
 
-  * ADF for data ingestion.
-
-  * Databricks for transformation.
-
-  * Data Lake Storage for structured storage.
-
-  * Delta Tables for reliable querying and versioning.
-
-  * Power BI for insights and analysis.
+   * ADF for data ingestion.
+ 
+   * Databricks for transformation.
+ 
+   * Data Lake Storage for structured storage.
+ 
+   * Delta Tables for reliable querying and versioning.
+ 
+   * Power BI for insights and analysis.
 
 This workflow ensures scalability, security, and efficiency in handling NYC Taxi data, enabling real-time analytics and decision-making.
 
